@@ -169,7 +169,7 @@ def main():
             edgecolors="black"
         )
 
-        # 각 데이터 포인트 옆에 영화 이름 레이블 추가
+        # 각 점 옆에 영화명 주석 표시
         for idx, row in display_df.iterrows():
             x_val = row["당일 관객수(명)"] / 10_000
             y_val = row["당일 매출액(원)"] / 100_000_000
@@ -188,6 +188,35 @@ def main():
 
         plt.tight_layout()
         st.pyplot(fig2)
+
+        st.markdown("---")
+
+        # 4. 영화별 매출 점유율 파이 차트(Pie Chart) 출력
+        st.subheader("🥧 영화별 매출 점유율 (파이 차트)")
+
+        fig3, ax3 = plt.subplots(figsize=(8, 8))
+
+        sales_share = df["salesShare"].astype(float)
+        labels = df["movieNm"]
+
+        # 도넛 형태의 파이 차트 시각화
+        wedges, texts, autotexts = ax3.pie(
+            sales_share,
+            labels=labels,
+            autopct='%1.1f%%',
+            startangle=140,
+            pctdistance=0.80,
+            textprops=dict(fontsize=9)
+        )
+
+        # 중앙 원을 추가하여 깔끔한 도넛 차트 형태로 디자인
+        centre_circle = plt.Circle((0, 0), 0.60, fc='white')
+        fig3.gca().add_artist(centre_circle)
+
+        ax3.set_title(f"영화별 매출 점유율 ({selected_date.strftime('%Y-%m-%d')})", fontsize=14, pad=15)
+        
+        plt.tight_layout()
+        st.pyplot(fig3)
 
     except requests.exceptions.HTTPError as err:
         st.error(f"API 요청에 실패했습니다: {err}")
