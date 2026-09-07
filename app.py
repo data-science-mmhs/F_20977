@@ -29,19 +29,16 @@ def set_korean_font():
         font_name = 'AppleGothic'
         plt.rc('font', family=font_name)
     else:  # Linux (Streamlit Community Cloud)
-        # 나눔고딕 폰트 다운로드 및 적용
         font_dir = os.path.join(os.getcwd(), ".fonts")
         os.makedirs(font_dir, exist_ok=True)
         font_path = os.path.join(font_dir, "NanumGothic.ttf")
 
         if not os.path.exists(font_path):
-            # 외부 CDN에서 나눔고딕 TTF 파일 다운로드
             url = "https://github.com/google/fonts/raw/main/ofl/nanumgothic/NanumGothic-Regular.ttf"
             res = requests.get(url, timeout=10)
             with open(font_path, "wb") as f:
                 f.write(res.content)
 
-        # 폰트 등록 및 적용
         fm.fontManager.addfont(font_path)
         font_prop = fm.FontProperties(fname=font_path)
         plt.rc('font', family=font_prop.get_name())
@@ -152,6 +149,45 @@ def main():
 
         plt.tight_layout()
         st.pyplot(fig)
+
+        st.markdown("---")
+
+        # 3. 관객수 vs 매출액 관계 산점도(Scatter Plot) 출력
+        st.subheader("📈 관객수 vs 매출액 관계 (산점도)")
+
+        fig2, ax2 = plt.subplots(figsize=(10, 6))
+
+        audi_in_thousands = display_df["당일 관객수(명)"] / 10_000  # 만 명 단위
+        sales_in_hundred_millions_sc = display_df["당일 매출액(원)"] / 100_000_000  # 억 원 단위
+
+        ax2.scatter(
+            audi_in_thousands, 
+            sales_in_hundred_millions_sc, 
+            color="#ff7f0e", 
+            s=100, 
+            alpha=0.8, 
+            edgecolors="black"
+        )
+
+        # 각 데이터 포인트 옆에 영화 이름 레이블 추가
+        for idx, row in display_df.iterrows():
+            x_val = row["당일 관객수(명)"] / 10_000
+            y_val = row["당일 매출액(원)"] / 100_000_000
+            ax2.annotate(
+                row["영화명"], 
+                (x_val, y_val), 
+                xytext=(5, 5), 
+                textcoords="offset points", 
+                fontsize=9
+            )
+
+        ax2.set_xlabel("당일 관객수 (만 명)", fontsize=11)
+        ax2.set_ylabel("당일 매출액 (억 원)", fontsize=11)
+        ax2.set_title(f"관객수와 매출액의 상관관계 ({selected_date.strftime('%Y-%m-%d')})", fontsize=14, pad=15)
+        ax2.grid(True, linestyle='--', alpha=0.5)
+
+        plt.tight_layout()
+        st.pyplot(fig2)
 
     except requests.exceptions.HTTPError as err:
         st.error(f"API 요청에 실패했습니다: {err}")
