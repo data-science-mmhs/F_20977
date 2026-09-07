@@ -14,35 +14,24 @@ st.set_page_config(
 )
 
 # ---------------------------------------------------------
-# [한글 폰트 설정] 로컬 및 Streamlit Cloud 지원
+# [한글 폰트 설정] OS별 설치된 폰트 로드
 # ---------------------------------------------------------
 @st.cache_resource
 def set_korean_font():
-    """OS별 한글 폰트를 설정하고, 폰트가 없을 경우 나눔고딕을 다운로드하여 적용합니다."""
+    """OS별 설치된 한글 폰트를 설정합니다."""
     import platform
     system_name = platform.system()
 
     if system_name == 'Windows':
         font_name = 'Malgun Gothic'
-        plt.rc('font', family=font_name)
     elif system_name == 'Darwin':  # Mac
         font_name = 'AppleGothic'
-        plt.rc('font', family=font_name)
-    else:  # Linux (Streamlit Community Cloud)
-        font_dir = os.path.join(os.getcwd(), ".fonts")
-        os.makedirs(font_dir, exist_ok=True)
-        font_path = os.path.join(font_dir, "NanumGothic.ttf")
+    else:  # Linux (Streamlit Community Cloud + packages.txt)
+        font_name = 'NanumGothic'
 
-        if not os.path.exists(font_path):
-            url = "https://github.com/google/fonts/raw/main/ofl/nanumgothic/NanumGothic-Regular.ttf"
-            res = requests.get(url, timeout=10)
-            with open(font_path, "wb") as f:
-                f.write(res.content)
-
-        fm.fontManager.addfont(font_path)
-        font_prop = fm.FontProperties(fname=font_path)
-        plt.rc('font', family=font_prop.get_name())
-
+    # Matplotlib 폰트 적용
+    plt.rc('font', family=font_name)
+    
     # 마이너스 기호 깨짐 방지 및 글로벌 스타일 테마 설정
     plt.rcParams['axes.unicode_minus'] = False
     plt.style.use('seaborn-v0_8-whitegrid')
@@ -123,7 +112,7 @@ def main():
         st.markdown("---")
 
         # ---------------------------------------------------------
-        # 2. 매출액 기준 막대그래프 출력 (디자인 개선)
+        # 2. 매출액 기준 막대그래프 출력
         # ---------------------------------------------------------
         st.subheader("📊 매출액 기준 Top 10 그래프")
         
@@ -133,7 +122,6 @@ def main():
         
         sales_in_hundred_millions = chart_df["당일 매출액(원)"] / 100_000_000
         
-        # 세련된 블루 톤 적용 및 테두리 정제
         bars = ax.barh(
             chart_df["영화명"], 
             sales_in_hundred_millions, 
@@ -146,14 +134,12 @@ def main():
         ax.set_ylabel("영화명", fontsize=11, fontweight='bold', labelpad=10)
         ax.set_title(f"일별 매출액 현황 ({selected_date.strftime('%Y-%m-%d')})", fontsize=14, fontweight='bold', pad=15)
         
-        # 테두리 가공 및 격자 스타일 설정
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
         ax.spines['left'].set_color('#cccccc')
         ax.spines['bottom'].set_color('#cccccc')
         ax.grid(axis='x', linestyle=':', alpha=0.6)
 
-        # 수치 레이블 표시
         max_sales = max(sales_in_hundred_millions)
         for bar in bars:
             width = bar.get_width()
@@ -173,14 +159,14 @@ def main():
         st.markdown("---")
 
         # ---------------------------------------------------------
-        # 3. 관객수 vs 매출액 관계 산점도 출력 (디자인 개선)
+        # 3. 관객수 vs 매출액 관계 산점도 출력
         # ---------------------------------------------------------
         st.subheader("📈 관객수 vs 매출액 관계 (산점도)")
 
         fig2, ax2 = plt.subplots(figsize=(10, 6))
 
-        audi_in_thousands = display_df["당일 관객수(명)"] / 10_000  # 만 명 단위
-        sales_in_hundred_millions_sc = display_df["당일 매출액(원)"] / 100_000_000  # 억 원 단위
+        audi_in_thousands = display_df["당일 관객수(명)"] / 10_000
+        sales_in_hundred_millions_sc = display_df["당일 매출액(원)"] / 100_000_000
 
         ax2.scatter(
             audi_in_thousands, 
@@ -193,7 +179,6 @@ def main():
             zorder=3
         )
 
-        # 각 점 옆에 영화명 주석 표시 (가독성 향상)
         for idx, row in display_df.iterrows():
             x_val = row["당일 관객수(명)"] / 10_000
             y_val = row["당일 매출액(원)"] / 100_000_000
@@ -220,7 +205,7 @@ def main():
         st.markdown("---")
 
         # ---------------------------------------------------------
-        # 4. 영화별 매출 점유율 파이 차트 출력 (디자인 개선)
+        # 4. 영화별 매출 점유율 파이 차트 출력
         # ---------------------------------------------------------
         st.subheader("🥧 영화별 매출 점유율 (파이 차트)")
 
@@ -229,7 +214,6 @@ def main():
         sales_share = df["salesShare"].astype(float)
         labels = df["movieNm"]
 
-        # 세련된 파스텔 톤 팔레트 사용
         colors = plt.cm.Set3(range(len(labels)))
 
         wedges, texts, autotexts = ax3.pie(
@@ -239,10 +223,9 @@ def main():
             startangle=140,
             pctdistance=0.78,
             colors=colors,
-            wedgeprops=dict(width=0.45, edgecolor='white', linewidth=2)  # 도넛 형태 및 경계선
+            wedgeprops=dict(width=0.45, edgecolor='white', linewidth=2)
         )
 
-        # 수치 및 레이블 텍스트 스타일 조정
         for text in texts:
             text.set_fontsize(9.5)
             text.set_color("#333333")
@@ -259,7 +242,7 @@ def main():
         st.markdown("---")
 
         # ---------------------------------------------------------
-        # 5. 관객수 기준 상위 5개 영화 막대그래프 출력 (디자인 개선)
+        # 5. 관객수 기준 상위 5개 영화 막대그래프 출력
         # ---------------------------------------------------------
         st.subheader("🔥 당일 관객수 Top 5 영화")
 
@@ -269,7 +252,6 @@ def main():
 
         top5_audi_in_thousands = top5_audi_df["당일 관객수(명)"] / 10_000
         
-        # 그린 톤 컬러 적용
         bars4 = ax4.bar(
             top5_audi_df["영화명"], 
             top5_audi_in_thousands, 
@@ -280,7 +262,7 @@ def main():
 
         ax4.set_xlabel("영화명", fontsize=11, fontweight='bold', labelpad=10)
         ax4.set_ylabel("당일 관객수 (만 명)", fontsize=11, fontweight='bold', labelpad=10)
-        ax4.set_title(f"관객수 Top 5 영화 현황 ({selected_date.strftime('%Y-%m-%d')})", fontsize=14, fontweight='bold', pad=15)
+        ax4.set_title(f"관객수 Top 5 영화 현황 ({selected_date.strftime('%Y-%m-%d')})", fontsize=14, pad=15)
         
         ax4.spines['top'].set_visible(False)
         ax4.spines['right'].set_visible(False)
@@ -288,7 +270,6 @@ def main():
         ax4.spines['bottom'].set_color('#cccccc')
         ax4.grid(axis='y', linestyle=':', alpha=0.6)
 
-        # 막대 위에 수치 레이블 추가
         max_audi = max(top5_audi_in_thousands)
         for bar in bars4:
             height = bar.get_height()
