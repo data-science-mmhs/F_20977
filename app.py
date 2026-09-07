@@ -43,8 +43,9 @@ def set_korean_font():
         font_prop = fm.FontProperties(fname=font_path)
         plt.rc('font', family=font_prop.get_name())
 
-    # 마이너스 기호 깨짐 방지
+    # 마이너스 기호 깨짐 방지 및 글로벌 스타일 테마 설정
     plt.rcParams['axes.unicode_minus'] = False
+    plt.style.use('seaborn-v0_8-whitegrid')
 
 # 한글 폰트 설정 실행
 set_korean_font()
@@ -121,7 +122,9 @@ def main():
 
         st.markdown("---")
 
-        # 2. 매출액 기준 막대그래프 출력
+        # ---------------------------------------------------------
+        # 2. 매출액 기준 막대그래프 출력 (디자인 개선)
+        # ---------------------------------------------------------
         st.subheader("📊 매출액 기준 Top 10 그래프")
         
         chart_df = display_df.sort_values("순위", ascending=False)
@@ -129,22 +132,39 @@ def main():
         fig, ax = plt.subplots(figsize=(10, 6))
         
         sales_in_hundred_millions = chart_df["당일 매출액(원)"] / 100_000_000
-        bars = ax.barh(chart_df["영화명"], sales_in_hundred_millions, color="#1f77b4")
         
-        ax.set_xlabel("당일 매출액 (억 원)", fontsize=11)
-        ax.set_ylabel("영화명", fontsize=11)
-        ax.set_title(f"일별 매출액 현황 ({selected_date.strftime('%Y-%m-%d')})", fontsize=14, pad=15)
-        ax.grid(axis='x', linestyle='--', alpha=0.5)
+        # 세련된 블루 톤 적용 및 테두리 정제
+        bars = ax.barh(
+            chart_df["영화명"], 
+            sales_in_hundred_millions, 
+            color="#4C72B0", 
+            edgecolor="none",
+            height=0.65
+        )
+        
+        ax.set_xlabel("당일 매출액 (억 원)", fontsize=11, fontweight='bold', labelpad=10)
+        ax.set_ylabel("영화명", fontsize=11, fontweight='bold', labelpad=10)
+        ax.set_title(f"일별 매출액 현황 ({selected_date.strftime('%Y-%m-%d')})", fontsize=14, fontweight='bold', pad=15)
+        
+        # 테두리 가공 및 격자 스타일 설정
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.spines['left'].set_color('#cccccc')
+        ax.spines['bottom'].set_color('#cccccc')
+        ax.grid(axis='x', linestyle=':', alpha=0.6)
 
-        # 막대 끝에 수치 표시
+        # 수치 레이블 표시
+        max_sales = max(sales_in_hundred_millions)
         for bar in bars:
             width = bar.get_width()
             ax.text(
-                width + (max(sales_in_hundred_millions) * 0.01), 
+                width + (max_sales * 0.015), 
                 bar.get_y() + bar.get_height() / 2, 
                 f"{width:.1f}억", 
                 va='center', 
-                fontsize=9
+                fontsize=9.5,
+                color="#333333",
+                fontweight='bold'
             )
 
         plt.tight_layout()
@@ -152,7 +172,9 @@ def main():
 
         st.markdown("---")
 
-        # 3. 관객수 vs 매출액 관계 산점도(Scatter Plot) 출력
+        # ---------------------------------------------------------
+        # 3. 관객수 vs 매출액 관계 산점도 출력 (디자인 개선)
+        # ---------------------------------------------------------
         st.subheader("📈 관객수 vs 매출액 관계 (산점도)")
 
         fig2, ax2 = plt.subplots(figsize=(10, 6))
@@ -163,35 +185,43 @@ def main():
         ax2.scatter(
             audi_in_thousands, 
             sales_in_hundred_millions_sc, 
-            color="#ff7f0e", 
-            s=100, 
-            alpha=0.8, 
-            edgecolors="black"
+            color="#DD8452", 
+            s=120, 
+            alpha=0.85, 
+            edgecolors="white",
+            linewidth=1.5,
+            zorder=3
         )
 
-        # 각 점 옆에 영화명 주석 표시
+        # 각 점 옆에 영화명 주석 표시 (가독성 향상)
         for idx, row in display_df.iterrows():
             x_val = row["당일 관객수(명)"] / 10_000
             y_val = row["당일 매출액(원)"] / 100_000_000
             ax2.annotate(
                 row["영화명"], 
                 (x_val, y_val), 
-                xytext=(5, 5), 
+                xytext=(7, 4), 
                 textcoords="offset points", 
-                fontsize=9
+                fontsize=9,
+                color="#222222"
             )
 
-        ax2.set_xlabel("당일 관객수 (만 명)", fontsize=11)
-        ax2.set_ylabel("당일 매출액 (억 원)", fontsize=11)
-        ax2.set_title(f"관객수와 매출액의 상관관계 ({selected_date.strftime('%Y-%m-%d')})", fontsize=14, pad=15)
-        ax2.grid(True, linestyle='--', alpha=0.5)
+        ax2.set_xlabel("당일 관객수 (만 명)", fontsize=11, fontweight='bold', labelpad=10)
+        ax2.set_ylabel("당일 매출액 (억 원)", fontsize=11, fontweight='bold', labelpad=10)
+        ax2.set_title(f"관객수와 매출액의 상관관계 ({selected_date.strftime('%Y-%m-%d')})", fontsize=14, fontweight='bold', pad=15)
+        
+        ax2.spines['top'].set_visible(False)
+        ax2.spines['right'].set_visible(False)
+        ax2.grid(True, linestyle=':', alpha=0.6)
 
         plt.tight_layout()
         st.pyplot(fig2)
 
         st.markdown("---")
 
-        # 4. 영화별 매출 점유율 파이 차트(Pie Chart) 출력
+        # ---------------------------------------------------------
+        # 4. 영화별 매출 점유율 파이 차트 출력 (디자인 개선)
+        # ---------------------------------------------------------
         st.subheader("🥧 영화별 매출 점유율 (파이 차트)")
 
         fig3, ax3 = plt.subplots(figsize=(8, 8))
@@ -199,28 +229,38 @@ def main():
         sales_share = df["salesShare"].astype(float)
         labels = df["movieNm"]
 
-        # 도넛 형태의 파이 차트 시각화
+        # 세련된 파스텔 톤 팔레트 사용
+        colors = plt.cm.Set3(range(len(labels)))
+
         wedges, texts, autotexts = ax3.pie(
             sales_share,
             labels=labels,
             autopct='%1.1f%%',
             startangle=140,
-            pctdistance=0.80,
-            textprops=dict(fontsize=9)
+            pctdistance=0.78,
+            colors=colors,
+            wedgeprops=dict(width=0.45, edgecolor='white', linewidth=2)  # 도넛 형태 및 경계선
         )
 
-        # 중앙 원을 추가하여 도넛 차트 형태로 표시
-        centre_circle = plt.Circle((0, 0), 0.60, fc='white')
-        fig3.gca().add_artist(centre_circle)
+        # 수치 및 레이블 텍스트 스타일 조정
+        for text in texts:
+            text.set_fontsize(9.5)
+            text.set_color("#333333")
+        for autotext in autotexts:
+            autotext.set_fontsize(8.5)
+            autotext.set_weight("bold")
+            autotext.set_color("#222222")
 
-        ax3.set_title(f"영화별 매출 점유율 ({selected_date.strftime('%Y-%m-%d')})", fontsize=14, pad=15)
+        ax3.set_title(f"영화별 매출 점유율 ({selected_date.strftime('%Y-%m-%d')})", fontsize=14, fontweight='bold', pad=15)
         
         plt.tight_layout()
         st.pyplot(fig3)
 
         st.markdown("---")
 
-        # 5. 관객수 기준 상위 5개 영화 막대그래프 출력
+        # ---------------------------------------------------------
+        # 5. 관객수 기준 상위 5개 영화 막대그래프 출력 (디자인 개선)
+        # ---------------------------------------------------------
         st.subheader("🔥 당일 관객수 Top 5 영화")
 
         top5_audi_df = display_df.sort_values("당일 관객수(명)", ascending=False).head(5)
@@ -228,26 +268,42 @@ def main():
         fig4, ax4 = plt.subplots(figsize=(10, 5))
 
         top5_audi_in_thousands = top5_audi_df["당일 관객수(명)"] / 10_000
-        bars4 = ax4.bar(top5_audi_df["영화명"], top5_audi_in_thousands, color="#2ca02c")
+        
+        # 그린 톤 컬러 적용
+        bars4 = ax4.bar(
+            top5_audi_df["영화명"], 
+            top5_audi_in_thousands, 
+            color="#55A868", 
+            width=0.5,
+            edgecolor="none"
+        )
 
-        ax4.set_xlabel("영화명", fontsize=11)
-        ax4.set_ylabel("당일 관객수 (만 명)", fontsize=11)
-        ax4.set_title(f"관객수 Top 5 영화 현황 ({selected_date.strftime('%Y-%m-%d')})", fontsize=14, pad=15)
-        ax4.grid(axis='y', linestyle='--', alpha=0.5)
+        ax4.set_xlabel("영화명", fontsize=11, fontweight='bold', labelpad=10)
+        ax4.set_ylabel("당일 관객수 (만 명)", fontsize=11, fontweight='bold', labelpad=10)
+        ax4.set_title(f"관객수 Top 5 영화 현황 ({selected_date.strftime('%Y-%m-%d')})", fontsize=14, fontweight='bold', pad=15)
+        
+        ax4.spines['top'].set_visible(False)
+        ax4.spines['right'].set_visible(False)
+        ax4.spines['left'].set_color('#cccccc')
+        ax4.spines['bottom'].set_color('#cccccc')
+        ax4.grid(axis='y', linestyle=':', alpha=0.6)
 
-        # 막대 위에 정확한 관객수 표시
+        # 막대 위에 수치 레이블 추가
+        max_audi = max(top5_audi_in_thousands)
         for bar in bars4:
             height = bar.get_height()
             ax4.text(
                 bar.get_x() + bar.get_width() / 2,
-                height + (max(top5_audi_in_thousands) * 0.01),
+                height + (max_audi * 0.02),
                 f"{height:.1f}만 명",
                 ha='center',
                 va='bottom',
-                fontsize=9
+                fontsize=9.5,
+                color="#333333",
+                fontweight='bold'
             )
 
-        plt.xticks(rotation=15, ha='right')  # 라벨 겹침 방지 기울임 처리
+        plt.xticks(rotation=0, ha='center', fontsize=9.5)
         plt.tight_layout()
         st.pyplot(fig4)
 
