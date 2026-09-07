@@ -209,7 +209,7 @@ def main():
             textprops=dict(fontsize=9)
         )
 
-        # 중앙 원을 추가하여 깔끔한 도넛 차트 형태로 디자인
+        # 중앙 원을 추가하여 도넛 차트 형태로 표시
         centre_circle = plt.Circle((0, 0), 0.60, fc='white')
         fig3.gca().add_artist(centre_circle)
 
@@ -217,6 +217,39 @@ def main():
         
         plt.tight_layout()
         st.pyplot(fig3)
+
+        st.markdown("---")
+
+        # 5. 관객수 기준 상위 5개 영화 막대그래프 출력
+        st.subheader("🔥 당일 관객수 Top 5 영화")
+
+        top5_audi_df = display_df.sort_values("당일 관객수(명)", ascending=False).head(5)
+
+        fig4, ax4 = plt.subplots(figsize=(10, 5))
+
+        top5_audi_in_thousands = top5_audi_df["당일 관객수(명)"] / 10_000
+        bars4 = ax4.bar(top5_audi_df["영화명"], top5_audi_in_thousands, color="#2ca02c")
+
+        ax4.set_xlabel("영화명", fontsize=11)
+        ax4.set_ylabel("당일 관객수 (만 명)", fontsize=11)
+        ax4.set_title(f"관객수 Top 5 영화 현황 ({selected_date.strftime('%Y-%m-%d')})", fontsize=14, pad=15)
+        ax4.grid(axis='y', linestyle='--', alpha=0.5)
+
+        # 막대 위에 정확한 관객수 표시
+        for bar in bars4:
+            height = bar.get_height()
+            ax4.text(
+                bar.get_x() + bar.get_width() / 2,
+                height + (max(top5_audi_in_thousands) * 0.01),
+                f"{height:.1f}만 명",
+                ha='center',
+                va='bottom',
+                fontsize=9
+            )
+
+        plt.xticks(rotation=15, ha='right')  # 라벨 겹침 방지 기울임 처리
+        plt.tight_layout()
+        st.pyplot(fig4)
 
     except requests.exceptions.HTTPError as err:
         st.error(f"API 요청에 실패했습니다: {err}")
