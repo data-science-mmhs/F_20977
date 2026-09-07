@@ -1,7 +1,9 @@
 import datetime
+import os
 import requests
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib.font_manager as fm
 import streamlit as st
 
 # 페이지 기본 설정
@@ -11,17 +13,44 @@ st.set_page_config(
     layout="wide"
 )
 
-# Matplotlib 한글 폰트 설정 (OS별)
-import platform
-if platform.system() == 'Darwin': # Mac
-    plt.rc('font', family='AppleGothic')
-elif platform.system() == 'Windows': # Windows
-    plt.rc('font', family='Malgun Gothic')
-else: # Linux / Streamlit Community Cloud
-    plt.rc('font', family='NanumGothic')
+# ---------------------------------------------------------
+# [한글 폰트 설정] 로컬 및 Streamlit Cloud 지원
+# ---------------------------------------------------------
+@st.cache_resource
+def set_korean_font():
+    """OS별 한글 폰트를 설정하고, 폰트가 없을 경우 나눔고딕을 다운로드하여 적용합니다."""
+    import platform
+    system_name = platform.system()
 
-# 마이너스 폰트 깨짐 방지
-plt.rcParams['axes.unicode_minus'] = False
+    if system_name == 'Windows':
+        font_name = 'Malgun Gothic'
+        plt.rc('font', family=font_name)
+    elif system_name == 'Darwin':  # Mac
+        font_name = 'AppleGothic'
+        plt.rc('font', family=font_name)
+    else:  # Linux (Streamlit Community Cloud)
+        # 나눔고딕 폰트 다운로드 및 적용
+        font_dir = os.path.join(os.getcwd(), ".fonts")
+        os.makedirs(font_dir, exist_ok=True)
+        font_path = os.path.join(font_dir, "NanumGothic.ttf")
+
+        if not os.path.exists(font_path):
+            # 외부 CDN에서 나눔고딕 TTF 파일 다운로드
+            url = "https://github.com/google/fonts/raw/main/ofl/nanumgothic/NanumGothic-Regular.ttf"
+            res = requests.get(url, timeout=10)
+            with open(font_path, "wb") as f:
+                f.write(res.content)
+
+        # 폰트 등록 및 적용
+        fm.fontManager.addfont(font_path)
+        font_prop = fm.FontProperties(fname=font_path)
+        plt.rc('font', family=font_prop.get_name())
+
+    # 마이너스 기호 깨짐 방지
+    plt.rcParams['axes.unicode_minus'] = False
+
+# 한글 폰트 설정 실행
+set_korean_font()
 
 
 @st.cache_data(ttl=3600)
@@ -52,7 +81,7 @@ def main():
 
     api_key = st.secrets["KOBIS_KEY"]
 
-    # 날짜 선택 (어제 날짜를 기본값으로 설정 - 당일 데이터는 집계 전일 수 있음)
+    # 날짜 선택 (어제 날짜를 기본값으로 설정)
     yesterday = datetime.date.today() - datetime.timedelta(days=1)
     selected_date = st.date_input("조회할 날짜를 선택하세요", value=yesterday, max_value=yesterday)
 
@@ -69,7 +98,6 @@ def main():
         # DataFrame 가공
         df = pd.DataFrame(raw_data)
         
-        # 주요 컬럼 추출 및 타입 변환
         display_df = pd.DataFrame({
             "순위": df["rank"].astype(int),
             "영화명": df["movieNm"],
@@ -99,14 +127,11 @@ def main():
         # 2. 매출액 기준 막대그래프 출력
         st.subheader("📊 매출액 기준 Top 10 그래프")
         
-        # 가로 막대그래프 생성을 위해 순위 역순 정렬
         chart_df = display_df.sort_values("순위", ascending=False)
 
         fig, ax = plt.subplots(figsize=(10, 6))
         
-        # 매출액 단위를 '억 원'으로 변환하여 시각화 가독성 개선
         sales_in_hundred_millions = chart_df["당일 매출액(원)"] / 100_000_000
-        
         bars = ax.barh(chart_df["영화명"], sales_in_hundred_millions, color="#1f77b4")
         
         ax.set_xlabel("당일 매출액 (억 원)", fontsize=11)
