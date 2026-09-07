@@ -14,27 +14,37 @@ st.set_page_config(
 )
 
 # ---------------------------------------------------------
-# [한글 폰트 설정] OS별 설치된 폰트 로드
+# [한글 폰트 설정] 로컬 및 Streamlit Cloud 지원
 # ---------------------------------------------------------
 @st.cache_resource
 def set_korean_font():
-    """OS별 설치된 한글 폰트를 설정합니다."""
+    """OS별 한글 폰트를 설정하고, 폰트가 없을 경우 나눔고딕을 다운로드하여 적용합니다."""
     import platform
     system_name = platform.system()
 
     if system_name == 'Windows':
         font_name = 'Malgun Gothic'
+        plt.rc('font', family=font_name)
     elif system_name == 'Darwin':  # Mac
         font_name = 'AppleGothic'
-    else:  # Linux (Streamlit Community Cloud + packages.txt)
-        font_name = 'NanumGothic'
+        plt.rc('font', family=font_name)
+    else:  # Linux (Streamlit Community Cloud)
+        font_dir = os.path.join(os.getcwd(), ".fonts")
+        os.makedirs(font_dir, exist_ok=True)
+        font_path = os.path.join(font_dir, "NanumGothic.ttf")
 
-    # Matplotlib 폰트 적용
-    plt.rc('font', family=font_name)
-    
-    # 마이너스 기호 깨짐 방지 및 글로벌 스타일 테마 설정
+        if not os.path.exists(font_path):
+            url = "https://github.com/google/fonts/raw/main/ofl/nanumgothic/NanumGothic-Regular.ttf"
+            res = requests.get(url, timeout=10)
+            with open(font_path, "wb") as f:
+                f.write(res.content)
+
+        fm.fontManager.addfont(font_path)
+        font_prop = fm.FontProperties(fname=font_path)
+        plt.rc('font', family=font_prop.get_name())
+
+    # 마이너스 기호 깨짐 방지
     plt.rcParams['axes.unicode_minus'] = False
-    plt.style.use('seaborn-v0_8-whitegrid')
 
 # 한글 폰트 설정 실행
 set_korean_font()
@@ -111,9 +121,7 @@ def main():
 
         st.markdown("---")
 
-        # ---------------------------------------------------------
         # 2. 매출액 기준 막대그래프 출력
-        # ---------------------------------------------------------
         st.subheader("📊 매출액 기준 Top 10 그래프")
         
         chart_df = display_df.sort_values("순위", ascending=False)
@@ -121,36 +129,22 @@ def main():
         fig, ax = plt.subplots(figsize=(10, 6))
         
         sales_in_hundred_millions = chart_df["당일 매출액(원)"] / 100_000_000
+        bars = ax.barh(chart_df["영화명"], sales_in_hundred_millions, color="#1f77b4")
         
-        bars = ax.barh(
-            chart_df["영화명"], 
-            sales_in_hundred_millions, 
-            color="#4C72B0", 
-            edgecolor="none",
-            height=0.65
-        )
-        
-        ax.set_xlabel("당일 매출액 (억 원)", fontsize=11, fontweight='bold', labelpad=10)
-        ax.set_ylabel("영화명", fontsize=11, fontweight='bold', labelpad=10)
-        ax.set_title(f"일별 매출액 현황 ({selected_date.strftime('%Y-%m-%d')})", fontsize=14, fontweight='bold', pad=15)
-        
-        ax.spines['top'].set_visible(False)
-        ax.spines['right'].set_visible(False)
-        ax.spines['left'].set_color('#cccccc')
-        ax.spines['bottom'].set_color('#cccccc')
-        ax.grid(axis='x', linestyle=':', alpha=0.6)
+        ax.set_xlabel("당일 매출액 (억 원)", fontsize=11)
+        ax.set_ylabel("영화명", fontsize=11)
+        ax.set_title(f"일별 매출액 현황 ({selected_date.strftime('%Y-%m-%d')})", fontsize=14, pad=15)
+        ax.grid(axis='x', linestyle='--', alpha=0.5)
 
-        max_sales = max(sales_in_hundred_millions)
+        # 막대 끝에 수치 표시
         for bar in bars:
             width = bar.get_width()
             ax.text(
-                width + (max_sales * 0.015), 
+                width + (max(sales_in_hundred_millions) * 0.01), 
                 bar.get_y() + bar.get_height() / 2, 
                 f"{width:.1f}억", 
                 va='center', 
-                fontsize=9.5,
-                color="#333333",
-                fontweight='bold'
+                fontsize=9
             )
 
         plt.tight_layout()
@@ -158,55 +152,46 @@ def main():
 
         st.markdown("---")
 
-        # ---------------------------------------------------------
-        # 3. 관객수 vs 매출액 관계 산점도 출력
-        # ---------------------------------------------------------
+        # 3. 관객수 vs 매출액 관계 산점도(Scatter Plot) 출력
         st.subheader("📈 관객수 vs 매출액 관계 (산점도)")
 
         fig2, ax2 = plt.subplots(figsize=(10, 6))
 
-        audi_in_thousands = display_df["당일 관객수(명)"] / 10_000
-        sales_in_hundred_millions_sc = display_df["당일 매출액(원)"] / 100_000_000
+        audi_in_thousands = display_df["당일 관객수(명)"] / 10_000  # 만 명 단위
+        sales_in_hundred_millions_sc = display_df["당일 매출액(원)"] / 100_000_000  # 억 원 단위
 
         ax2.scatter(
             audi_in_thousands, 
             sales_in_hundred_millions_sc, 
-            color="#DD8452", 
-            s=120, 
-            alpha=0.85, 
-            edgecolors="white",
-            linewidth=1.5,
-            zorder=3
+            color="#ff7f0e", 
+            s=100, 
+            alpha=0.8, 
+            edgecolors="black"
         )
 
+        # 각 점 옆에 영화명 주석 표시
         for idx, row in display_df.iterrows():
             x_val = row["당일 관객수(명)"] / 10_000
             y_val = row["당일 매출액(원)"] / 100_000_000
             ax2.annotate(
                 row["영화명"], 
                 (x_val, y_val), 
-                xytext=(7, 4), 
+                xytext=(5, 5), 
                 textcoords="offset points", 
-                fontsize=9,
-                color="#222222"
+                fontsize=9
             )
 
-        ax2.set_xlabel("당일 관객수 (만 명)", fontsize=11, fontweight='bold', labelpad=10)
-        ax2.set_ylabel("당일 매출액 (억 원)", fontsize=11, fontweight='bold', labelpad=10)
-        ax2.set_title(f"관객수와 매출액의 상관관계 ({selected_date.strftime('%Y-%m-%d')})", fontsize=14, fontweight='bold', pad=15)
-        
-        ax2.spines['top'].set_visible(False)
-        ax2.spines['right'].set_visible(False)
-        ax2.grid(True, linestyle=':', alpha=0.6)
+        ax2.set_xlabel("당일 관객수 (만 명)", fontsize=11)
+        ax2.set_ylabel("당일 매출액 (억 원)", fontsize=11)
+        ax2.set_title(f"관객수와 매출액의 상관관계 ({selected_date.strftime('%Y-%m-%d')})", fontsize=14, pad=15)
+        ax2.grid(True, linestyle='--', alpha=0.5)
 
         plt.tight_layout()
         st.pyplot(fig2)
 
         st.markdown("---")
 
-        # ---------------------------------------------------------
-        # 4. 영화별 매출 점유율 파이 차트 출력
-        # ---------------------------------------------------------
+        # 4. 영화별 매출 점유율 파이 차트(Pie Chart) 출력
         st.subheader("🥧 영화별 매출 점유율 (파이 차트)")
 
         fig3, ax3 = plt.subplots(figsize=(8, 8))
@@ -214,36 +199,28 @@ def main():
         sales_share = df["salesShare"].astype(float)
         labels = df["movieNm"]
 
-        colors = plt.cm.Set3(range(len(labels)))
-
+        # 도넛 형태의 파이 차트 시각화
         wedges, texts, autotexts = ax3.pie(
             sales_share,
             labels=labels,
             autopct='%1.1f%%',
             startangle=140,
-            pctdistance=0.78,
-            colors=colors,
-            wedgeprops=dict(width=0.45, edgecolor='white', linewidth=2)
+            pctdistance=0.80,
+            textprops=dict(fontsize=9)
         )
 
-        for text in texts:
-            text.set_fontsize(9.5)
-            text.set_color("#333333")
-        for autotext in autotexts:
-            autotext.set_fontsize(8.5)
-            autotext.set_weight("bold")
-            autotext.set_color("#222222")
+        # 중앙 원을 추가하여 도넛 차트 형태로 표시
+        centre_circle = plt.Circle((0, 0), 0.60, fc='white')
+        fig3.gca().add_artist(centre_circle)
 
-        ax3.set_title(f"영화별 매출 점유율 ({selected_date.strftime('%Y-%m-%d')})", fontsize=14, fontweight='bold', pad=15)
+        ax3.set_title(f"영화별 매출 점유율 ({selected_date.strftime('%Y-%m-%d')})", fontsize=14, pad=15)
         
         plt.tight_layout()
         st.pyplot(fig3)
 
         st.markdown("---")
 
-        # ---------------------------------------------------------
         # 5. 관객수 기준 상위 5개 영화 막대그래프 출력
-        # ---------------------------------------------------------
         st.subheader("🔥 당일 관객수 Top 5 영화")
 
         top5_audi_df = display_df.sort_values("당일 관객수(명)", ascending=False).head(5)
@@ -251,40 +228,26 @@ def main():
         fig4, ax4 = plt.subplots(figsize=(10, 5))
 
         top5_audi_in_thousands = top5_audi_df["당일 관객수(명)"] / 10_000
-        
-        bars4 = ax4.bar(
-            top5_audi_df["영화명"], 
-            top5_audi_in_thousands, 
-            color="#55A868", 
-            width=0.5,
-            edgecolor="none"
-        )
+        bars4 = ax4.bar(top5_audi_df["영화명"], top5_audi_in_thousands, color="#2ca02c")
 
-        ax4.set_xlabel("영화명", fontsize=11, fontweight='bold', labelpad=10)
-        ax4.set_ylabel("당일 관객수 (만 명)", fontsize=11, fontweight='bold', labelpad=10)
+        ax4.set_xlabel("영화명", fontsize=11)
+        ax4.set_ylabel("당일 관객수 (만 명)", fontsize=11)
         ax4.set_title(f"관객수 Top 5 영화 현황 ({selected_date.strftime('%Y-%m-%d')})", fontsize=14, pad=15)
-        
-        ax4.spines['top'].set_visible(False)
-        ax4.spines['right'].set_visible(False)
-        ax4.spines['left'].set_color('#cccccc')
-        ax4.spines['bottom'].set_color('#cccccc')
-        ax4.grid(axis='y', linestyle=':', alpha=0.6)
+        ax4.grid(axis='y', linestyle='--', alpha=0.5)
 
-        max_audi = max(top5_audi_in_thousands)
+        # 막대 위에 정확한 관객수 표시
         for bar in bars4:
             height = bar.get_height()
             ax4.text(
                 bar.get_x() + bar.get_width() / 2,
-                height + (max_audi * 0.02),
+                height + (max(top5_audi_in_thousands) * 0.01),
                 f"{height:.1f}만 명",
                 ha='center',
                 va='bottom',
-                fontsize=9.5,
-                color="#333333",
-                fontweight='bold'
+                fontsize=9
             )
 
-        plt.xticks(rotation=0, ha='center', fontsize=9.5)
+        plt.xticks(rotation=15, ha='right')  # 라벨 겹침 방지 기울임 처리
         plt.tight_layout()
         st.pyplot(fig4)
 
