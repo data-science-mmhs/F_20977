@@ -236,55 +236,53 @@ with tab5:
 with tab6:
     st.subheader("🗓️ 전체 관객수 합계 캘린더 히트맵")
     
-    # 1. 날짜 데이터 기반 요일 및 주차 계산
+    # 1. 연속 주차 및 요일 계산
     cal_df = daily_top10_sum.copy()
     
     # 요일 순서 고정 (월요일~일요일)
     days_order = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
     days_kor = ["월", "화", "수", "목", "금", "토", "일"]
     
-    cal_df["주차"] = cal_df["기준일자"].dt.isocalendar().week
+    # 첫 날 기준으로 리셋 없는 연속 주차 번호 생성 (1, 2, 3... 52, 53...)
+    min_date = cal_df["기준일자"].min()
+    cal_df["연속주차"] = (cal_df["기준일자"] - min_date).dt.days // 7 + 1
     cal_df["요일코드"] = cal_df["기준일자"].dt.strftime("%a")
-    cal_df["월"] = cal_df["기준일자"].dt.month
-    cal_df["일자명"] = cal_df["기준일자"].dt.strftime("%Y-%m-%d")
+    cal_df["연월"] = cal_df["기준일자"].dt.strftime("%Y-%m")
+    cal_df["월명"] = cal_df["기준일자"].dt.strftime("%y년 %m월")
     
-    # 2. pivot() 대신 pivot_table() 사용 (중복값이 있을 경우 mean/sum 집계)
-    pivot_df = cal_df.pivot_table(
-        index="요일코드", 
-        columns="주차", 
-        values="해당일관객수", 
-        aggfunc="mean" # 동일 요일/주차 중복 시 평균값 집계
-    )
+    # 2. 피벗 테이블 생성 (행: 요일, 열: 연속주차, 값: 해당일관객수)
+    pivot_df = cal_df.pivot(index="요일코드", columns="연속주차", values="해당일관객수")
     pivot_df = pivot_df.reindex(days_order) # 월~일 순서 정렬
     pivot_df.index = days_kor # 한글 요일로 변경
     
-    # 3. 각 달이 시작하는 주차(Week) 위치와 월 이름을 추출하여 X축 눈금 생성
-    first_days = cal_df.groupby("월").first().reset_index()
-    month_weeks = first_days["주차"].tolist()
-    month_labels = [f"{m}월" for m in first_days["월"]]
+    # 3. 각 달이 시작하는 연속주차 위치와 월 이름을 추출하여 X축 눈금 생성
+    first_days_per_month = cal_df.groupby("연월").first().reset_index()
+    month_weeks = first_days_per_month["연속주차"].tolist()
+    month_labels = first_days_per_month["월명"].tolist()
     
     # 4. Plotly 히트맵 구현
     fig6 = px.imshow(
         pivot_df,
-        labels=dict(x="월 (주차 기준)", y="요일", color="총 관객수 (명)"),
+        labels=dict(x="기간 (월별 구분)", y="요일", color="총 관객수 (명)"),
         x=pivot_df.columns,
         y=pivot_df.index,
-        color_continuous_scale="Blues",
+        color_continuous_scale="Blues", # 값이 클수록 진한 색
         aspect="auto"
     )
     
-    # 레이아웃 설정
+    # 레이아웃 설정: 각 달의 시작 위치에 'YY년 MM월' 표시
     fig6.update_layout(
-        title="일별 전체 관객수 합계 캘린더 히트맵",
+        title="전체 기간 일별 관객수 합계 캘린더 히트맵 (연속 주차)",
         xaxis=dict(
             tickmode="array",
             tickvals=month_weeks,
-            ticktext=month_labels
+            ticktext=month_labels,
+            title="월 (시작 시점)"
         ),
-        yaxis=dict(autorange="reversed")
+        yaxis=dict(autorange="reversed") # 월요일이 위로 오도록 설정
     )
     
     st.plotly_chart(fig6, use_container_width=True)
     
     # '이 그래프로 알 수 있는 것' 안내문
-    st.info("💡 **이 그래프로 알 수 있는 것:** 연중 일별 극장 관객수 밀도를 달력 형태로 시각화하여, 주말(토/일)과 평일 간의 확실한 관객수 격차뿐만 아니라 연휴, 방학, 명절 시즌 등 관객수가 크게 몰렸던 특수 일자들을 한눈에 식별할 수 있습니다.")
+    st.info("💡 **이 그래프로 알 수 있는 것:** 1년 이상의 전체 데이터 기간 동안 연도 리셋 없이 일별 관객수 밀도를 달력 형태로 시각화했습니다. 주말과 평일 간의 관객수 격차는 물론, 연도별 명절, 방학, 황금연휴 시즌 등 관객 몰림 현상이 일어난 특정 주차를 연속적이고 직관적으로 비교할 수 있습니다.")
