@@ -255,7 +255,7 @@ st.markdown("---")
 # ==========================================
 st.header("🗓️ 6. 월 × 요일별 전체 관객수 히트맵")
 
-# 1. 월(YYYY-MM)과 요일 정보 추출
+# 1. 월과 요일 정보 추출
 heatmap_data = daily_total.copy()
 heatmap_data["월"] = heatmap_data["기준일자"].dt.strftime("%Y-%m")
 heatmap_data["요일"] = heatmap_data["기준일자"].dt.day_name()
@@ -277,36 +277,30 @@ day_kr_map = {
     "Thursday": "목요일",
     "Friday": "금요일",
     "Saturday": "토요일",
+    "Sunday": "일요일",
 }
-day_kr_map["Sunday"] = "일요일"
 
 # 요일 정렬을 위한 카테고리화
 heatmap_data["요일"] = pd.Categorical(
     heatmap_data["요일"], categories=day_order, ordered=True
 )
 
-# 3. 데이터 원본의 날짜 오름차순 순서를 유지하여 '연월' 고유 목록 추출 (년도/월 순서 보장)
-month_order = heatmap_data["월"].unique().tolist()
-
-# 4. 월 x 요일 그룹화 및 피벗 테이블 생성
+# 3. 월 x 요일 그룹화 및 합산
 pivot_df = (
     heatmap_data.groupby(["월", "요일"], observed=False)["해당일관객수"]
     .sum()
     .unstack(level="요일")
 )
 
-# 연-월 순서(오름차순)가 보장되도록 reindex 설정
-pivot_df = pivot_df.reindex(month_order)
-
 # 요일 컬럼명을 한글로 변경
 pivot_df.columns = [
     day_kr_map[col] for col in pivot_df.columns
 ]
 
-# 5. Plotly 히트맵 생성
+# 4. Plotly 히트맵 생성 (색상이 진할수록 관객수 증가 - Blues 컬러스케일 적용)
 fig6 = px.imshow(
     pivot_df,
-    labels=dict(x="요일", y="월(연도-월)", color="관객수 합계"),
+    labels=dict(x="요일", y="월", color="관객수 합계"),
     x=[day_kr_map[d] for d in day_order],
     y=pivot_df.index.tolist(),
     color_continuous_scale="Reds",  # 진할수록 관객수가 많은 색상 패턴
@@ -314,11 +308,10 @@ fig6 = px.imshow(
     aspect="auto",
 )
 
-# Y축의 연-월 순서가 위에서 아래로 시간 순서대로 정렬되도록 조정 ('reversed' 축 설정)
+# 그래프 레이아웃 설정
 fig6.update_layout(
     xaxis_title="요일",
-    yaxis_title="월(연도-월)",
-    yaxis=dict(autorange="reversed"),  # 상단이 과거, 하단이 최근 연-월로 정렬
+    yaxis_title="월",
 )
 
 # 그래프 화면 출력
@@ -326,5 +319,5 @@ st.plotly_chart(fig6, use_container_width=True)
 
 # 그래프 하단 설명 문구 (캡션)
 st.caption(
-    "💡 **이 그래프로 알 수 있는 것:** 연도 및 월 순서대로 배치된 히트맵을 통해 특정 시기(월)와 요일별 관객 집중도를 관객수가 많을수록 짙어지는 색상 패턴으로 직관적으로 파악할 수 있습니다."
+    "💡 **이 그래프로 알 수 있는 것:** 특정 월과 특정 요일 간의 관객수 집중도를 색상의 짙은 정도(진함)로 한눈에 비교하여, 연중 어느 달의 무슨 요일에 극장 방문객이 가장 많은지 패턴을 파악할 수 있습니다."
 )
