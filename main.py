@@ -205,15 +205,29 @@ st.caption(
 )
 
 st.markdown("---")
-
 # ==========================================
-# [여섯 번째 그래프: 월 x 요일별 관객수 히트맵 구역 (섹션 6 - 수정됨)]
+# [여섯 번째 그래프: 월/주차 x 요일별 관객수 히트맵 구역 (섹션 6 - 수정됨)]
 # ==========================================
-st.header("🗓️ 6. 월 × 요일별 전체 관객수 히트맵")
+st.header("🗓️ 6. 월/주차 × 요일별 전체 관객수 히트맵")
 
-# 1. 기초 컬럼 추출 (연-월, 요일, YYYY-MM-DD 형태의 날짜)
+# 1. 기초 컬럼 추출 (연-월, 월 내 주차, 요일, YYYY-MM-DD 날짜)
 heatmap_data = daily_total.copy()
-heatmap_data["월"] = heatmap_data["기준일자"].dt.strftime("%Y-%m")
+
+
+# 월 내 주차(Week of Month) 계산 함수
+def get_week_of_month(dt):
+    first_day = dt.replace(day=1)
+    # 해당 월의 첫 번째 날과의 주 차이 계산 (+1주)
+    adjusted_dom = dt.day + first_day.weekday()
+    return (adjusted_dom - 1) // 7 + 1
+
+
+heatmap_data["연월"] = heatmap_data["기준일자"].dt.strftime("%Y-%m")
+heatmap_data["주차"] = heatmap_data["기준일자"].apply(get_week_of_month)
+heatmap_data["월_주차"] = (
+    heatmap_data["연월"] + " W" + heatmap_data["주차"].astype(str)
+)
+
 heatmap_data["요일"] = heatmap_data["기준일자"].dt.day_name()
 heatmap_data["날짜str"] = heatmap_data["기준일자"].dt.strftime("%Y-%m-%d")
 
@@ -241,11 +255,11 @@ heatmap_data["요일"] = pd.Categorical(
     heatmap_data["요일"], categories=day_order, ordered=True
 )
 
-# 3. 월 오름차순 목록 추출 및 그룹화 (관객수 합계 & 해당 셀의 날짜 목록 집계)
-month_order = heatmap_data["월"].unique().tolist()
+# 3. 월/주차 오름차순 목록 추출 및 그룹화 (관객수 합계 & 해당 셀의 날짜 목록 집계)
+week_order = heatmap_data["월_주차"].unique().tolist()
 
 grouped = (
-    heatmap_data.groupby(["월", "요일"], observed=False)
+    heatmap_data.groupby(["월_주차", "요일"], observed=False)
     .agg(
         관객수합계=("해당일관객수", "sum"),
         날짜목록=(
@@ -256,44 +270,44 @@ grouped = (
     .reset_index()
 )
 
-# 4. 피벗 테이블 생성 (z축: 관객수합계, customdata축: yyyy-mm-dd 날짜들)
+# 4. 피벗 테이블 생성 (z축: 관객수합계, customdata축: YYYY-MM-DD 날짜들)
 pivot_sum = grouped.pivot(
-    index="월", columns="요일", values="관객수합계"
-).reindex(month_order)
+    index="월_주차", columns="요일", values="관객수합계"
+).reindex(week_order)
 pivot_dates = grouped.pivot(
-    index="월", columns="요일", values="날짜목록"
-).reindex(month_order)
+    index="월_주차", columns="요일", values="날짜목록"
+).reindex(week_order)
 
-# 컬럼(요일) 한글화
+# 컬럼(요일) 한글화 및 축 라벨 지정
 x_labels = [day_kr_map[d] for d in day_order]
 y_labels = pivot_sum.index.tolist()
 
-# 5. Plotly px.imshow 및 호버 툴팁(hovertemplate) 적용
+# 5. Plotly px.imshow 및 호버 툴팁 적용
 fig6 = px.imshow(
     pivot_sum,
-    labels=dict(x="요일", y="월(연도-월)", color="관객수 합계"),
+    labels=dict(x="요일", y="월 / 주차", color="관객수 합계"),
     x=x_labels,
     y=y_labels,
-    color_continuous_scale="Reds",  # 관객수가 많을수록 짙어지는 레드 스케일
-    title="월 × 요일별 전체 관객수 집계 (히트맵)",
+    color_continuous_scale="Reds",  # 관객수가 많을수록 짙어지는 색상
+    title="월/주차 × 요일별 전체 관객수 집계 (캘린더 히트맵)",
     aspect="auto",
 )
 
-# 마우스 올렸을 때 YYYY-MM-DD 날짜 리스트 및 관객수 정보가 보이도록 설정
+# 마우스 올렸을 때 YYYY-MM-DD 날짜 및 관객수가 표기되도록 툴팁 변경
 fig6.update_traces(
     customdata=pivot_dates.values,
     hovertemplate=(
         "<b>%{y} %{x}</b><br><br>"
-        "<b>📅 해당 날짜 목록:</b><br>%{customdata}<br><br>"
-        "<b>👥 총 관객수:</b> %{z:,}명"
+        "<b>📅 해당 날짜:</b><br>%{customdata}<br><br>"
+        "<b>👥 관객수 합계:</b> %{z:,}명"
         "<extra></extra>"
     ),
 )
 
-# Y축 역순 정렬 (과거 월이 위, 최근 월이 아래)
+# Y축 역순 정렬 (상단이 과거 주차, 하단이 최근 주차)
 fig6.update_layout(
     xaxis_title="요일",
-    yaxis_title="월(연도-월)",
+    yaxis_title="월 / 주차",
     yaxis=dict(autorange="reversed"),
 )
 
@@ -302,5 +316,5 @@ st.plotly_chart(fig6, use_container_width=True)
 
 # 그래프 하단 설명 문구 (캡션)
 st.caption(
-    "💡 **이 그래프로 알 수 있는 것:** 월 및 요일별 관객 수 집계 현황을 색상 농도로 파악할 수 있으며, 마우스를 올리면 해당 셀에 속한 실제 날짜(`YYYY-MM-DD`) 목록과 관객수를 확인할 수 있습니다."
+    "💡 **이 그래프로 알 수 있는 것:** 월/주차별 요일 관객 현황을 색상 패턴으로 파악할 수 있으며, 마우스를 해당 영역에 올리면 속한 실제 날짜(`YYYY-MM-DD`)와 일관객 합계를 볼 수 있습니다."
 )
