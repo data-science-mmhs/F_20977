@@ -248,8 +248,13 @@ with tab6:
     cal_df["월"] = cal_df["기준일자"].dt.month
     cal_df["일자명"] = cal_df["기준일자"].dt.strftime("%Y-%m-%d")
     
-    # 2. 피벗 테이블 생성 (행: 요일, 열: 주차, 값: 해당일관객수)
-    pivot_df = cal_df.pivot(index="요일코드", columns="주차", values="해당일관객수")
+    # 2. pivot() 대신 pivot_table() 사용 (중복값이 있을 경우 mean/sum 집계)
+    pivot_df = cal_df.pivot_table(
+        index="요일코드", 
+        columns="주차", 
+        values="해당일관객수", 
+        aggfunc="mean" # 동일 요일/주차 중복 시 평균값 집계
+    )
     pivot_df = pivot_df.reindex(days_order) # 월~일 순서 정렬
     pivot_df.index = days_kor # 한글 요일로 변경
     
@@ -264,11 +269,11 @@ with tab6:
         labels=dict(x="월 (주차 기준)", y="요일", color="총 관객수 (명)"),
         x=pivot_df.columns,
         y=pivot_df.index,
-        color_continuous_scale="Blues", # 값이 클수록 진한 파란색
+        color_continuous_scale="Blues",
         aspect="auto"
     )
     
-    # 레이아웃 설정: 각 달의 시작 위치에 월 이름 표시
+    # 레이아웃 설정
     fig6.update_layout(
         title="일별 전체 관객수 합계 캘린더 히트맵",
         xaxis=dict(
@@ -276,7 +281,7 @@ with tab6:
             tickvals=month_weeks,
             ticktext=month_labels
         ),
-        yaxis=dict(autorange="reversed") # 월요일이 위로 오도록 설정
+        yaxis=dict(autorange="reversed")
     )
     
     st.plotly_chart(fig6, use_container_width=True)
