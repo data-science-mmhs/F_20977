@@ -59,7 +59,7 @@ tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
     "📊 TOP10 관객수 7일 이동평균", 
     "📅 월별 전체 관객수 (막대그래프)",
     "🏆 TOP5 영화 누적관객수 비교 (다중 선그래프)",
-    "➕ 추가 분석 구역 (예정)"
+    "🗓️ 관객수 캘린더 히트맵"
 ])
 
 # -----------------------------------------------------------------------------
@@ -194,13 +194,9 @@ with tab4:
 with tab5:
     st.subheader("🏆 장기 흥행(20일 이상 차트인) TOP 5 영화의 누적관객수 추이")
     
-    # 1. 영화별 차트인(TOP10 진입) 등장 일수 계산
     movie_counts = df.groupby("영화명")["기준일자"].nunique()
-    
-    # 2. 20일 이상 등장한 영화 리스트 필터링
     movies_over_20days = movie_counts[movie_counts >= 20].index
     
-    # 3. 해당 영화들 중 최고 누적관객수 상위 5개 영화 선별
     top5_movies = (
         df[df["영화명"].isin(movies_over_20days)]
         .groupby("영화명")["누적관객수"]
@@ -210,10 +206,8 @@ with tab5:
         .tolist()
     )
     
-    # 4. 선택된 5개 영화의 데이터 추출
     top5_df = df[df["영화명"].isin(top5_movies)].copy()
     
-    # 5. 다중 선그래프 생성 (color='영화명'으로 색상 및 범례 자동 구분)
     fig5 = px.line(
         top5_df,
         x="기준일자",
@@ -234,14 +228,58 @@ with tab5:
     st.plotly_chart(fig5, use_container_width=True)
     
     top5_str = ", ".join([f"'{m}'" for m in top5_movies])
-    
-    # '이 그래프로 알 수 있는 것' 공간
     st.info(f"💡 **이 그래프로 알 수 있는 것:** 박스오피스 TOP10에 20일 이상 연속/장기 진입하며 꾸준한 관객을 모은 대표 흥행작({top5_str}) 5편의 관객수 누적 속도와 시기별 흥행 격차를 비교할 수 있습니다.")
 
 # -----------------------------------------------------------------------------
-# 여섯 번째 탭: [추가 예정 구역]
+# 여섯 번째 그래프: [캘린더 히트맵 - 일별 전체 관객수 합계]
 # -----------------------------------------------------------------------------
 with tab6:
-    st.subheader("📊 추가 그래프 영역")
-    st.write("앞으로 이 구역에 추가적인 분석 그래프나 통계 정보를 확장할 수 있습니다.")
-    st.info("💡 **이 그래프로 알 수 있는 것:** (추가 예정 그래프에 대한 설명이 들어갈 자리입니다.)")
+    st.subheader("🗓️ 전체 관객수 합계 캘린더 히트맵")
+    
+    # 1. 날짜 데이터 기반 요일 및 주차 계산
+    cal_df = daily_top10_sum.copy()
+    
+    # 요일 순서 고정 (월요일~일요일)
+    days_order = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    days_kor = ["월", "화", "수", "목", "금", "토", "일"]
+    
+    cal_df["주차"] = cal_df["기준일자"].dt.isocalendar().week
+    cal_df["요일코드"] = cal_df["기준일자"].dt.strftime("%a")
+    cal_df["월"] = cal_df["기준일자"].dt.month
+    cal_df["일자명"] = cal_df["기준일자"].dt.strftime("%Y-%m-%d")
+    
+    # 2. 피벗 테이블 생성 (행: 요일, 열: 주차, 값: 해당일관객수)
+    pivot_df = cal_df.pivot(index="요일코드", columns="주차", values="해당일관객수")
+    pivot_df = pivot_df.reindex(days_order) # 월~일 순서 정렬
+    pivot_df.index = days_kor # 한글 요일로 변경
+    
+    # 3. 각 달이 시작하는 주차(Week) 위치와 월 이름을 추출하여 X축 눈금 생성
+    first_days = cal_df.groupby("월").first().reset_index()
+    month_weeks = first_days["주차"].tolist()
+    month_labels = [f"{m}월" for m in first_days["월"]]
+    
+    # 4. Plotly 히트맵 구현
+    fig6 = px.imshow(
+        pivot_df,
+        labels=dict(x="월 (주차 기준)", y="요일", color="총 관객수 (명)"),
+        x=pivot_df.columns,
+        y=pivot_df.index,
+        color_continuous_scale="Blues", # 값이 클수록 진한 파란색
+        aspect="auto"
+    )
+    
+    # 레이아웃 설정: 각 달의 시작 위치에 월 이름 표시
+    fig6.update_layout(
+        title="일별 전체 관객수 합계 캘린더 히트맵",
+        xaxis=dict(
+            tickmode="array",
+            tickvals=month_weeks,
+            ticktext=month_labels
+        ),
+        yaxis=dict(autorange="reversed") # 월요일이 위로 오도록 설정
+    )
+    
+    st.plotly_chart(fig6, use_container_width=True)
+    
+    # '이 그래프로 알 수 있는 것' 안내문
+    st.info("💡 **이 그래프로 알 수 있는 것:** 연중 일별 극장 관객수 밀도를 달력 형태로 시각화하여, 주말(토/일)과 평일 간의 확실한 관객수 격차뿐만 아니라 연휴, 방학, 명절 시즌 등 관객수가 크게 몰렸던 특수 일자들을 한눈에 식별할 수 있습니다.")
