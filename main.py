@@ -12,24 +12,24 @@ st.caption("KOBIS 1개년 박스오피스 데이터를 바탕으로 한 관객 �
 # 2. 데이터 불러오기 및 전처리 (캐싱 적용)
 # @st.cache_data는 데이터를 한 번 읽어온 뒤 메모리에 저장해두어 앱 실행 속도를 높여줍니다.
 @st.cache_data
+@st.cache_data
 def load_and_preprocess_data():
     url = "https://raw.githubusercontent.com/keep-growing-park/data-science/refs/heads/main/dataset/kobis_1year_boxoffice.csv"
     
     # CSV 데이터 불러오기
     df = pd.read_csv(url)
     
-    # [전처리 1] 결측치가 포함된 행 제거
-    df = df.dropna()
+    # [전처리 1] 날짜 형식 변환 (잘못된 문자열이나 공백은 NaT로 안전하게 변환)
+    df['기준일자'] = pd.to_datetime(df['기준일자'], errors='coerce')
+    df['개봉일'] = pd.to_datetime(df['개봉일'], errors='coerce')
     
-    # [전처리 2] '기준일자' 및 '개봉일' 컬럼을 datetime(날짜) 형식으로 변환
-    df['기준일자'] = pd.to_datetime(df['기준일자'])
-    df['개봉일'] = pd.to_datetime(df['개봉일'])
+    # [전처리 2] 결측치 및 날짜 변환에 실패한(NaT) 행 제거
+    df = df.dropna().reset_index(drop=True)
     
     # [전처리 3] 전체 데이터를 기준일자 순서대로 정렬 (오름차순)
     df = df.sort_values(by='기준일자').reset_index(drop=True)
     
     return df
-
 # 데이터 로드
 df = load_and_preprocess_data()
 
