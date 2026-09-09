@@ -2,73 +2,100 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 
-# 페이지 기본 설정 (넓은 화면 레이아웃)
-st.set_page_config(page_title="영화 박스오피스 대시보드", layout="wide")
+# 1. 페이지 기본 설정 (웹 브라우저 탭 제목 및 레이아웃 설정)
+st.set_page_config(page_title="영화 박스오피스 분석 대시보드", layout="wide")
 
-# App 제목
-st.title("🎬 KOBIS 영화 박스오피스 데이터 분석")
+# App 제목 설정
+st.title("🎬 영화 박스오피스 데이터 분석 대시보드")
+st.caption("KOBIS 1개년 박스오피스 데이터를 바탕으로 한 관객 수 추이 분석 앱입니다.")
 
-# [1. 데이터 불러오기 및 재사용 설정]
-# @st.cache_data를 사용하면 데이터를 매번 새로 불러오지 않고 저장해둔 캐시를 사용합니다.
+# 2. 데이터 불러오기 및 전처리 (캐싱 적용)
+# @st.cache_data는 데이터를 한 번 읽어온 뒤 메모리에 저장해두어 앱 실행 속도를 높여줍니다.
 @st.cache_data
-def load_data():
+def load_and_preprocess_data():
     url = "https://raw.githubusercontent.com/keep-growing-park/data-science/refs/heads/main/dataset/kobis_1year_boxoffice.csv"
+    
+    # CSV 데이터 불러오기
     df = pd.read_csv(url)
     
-    # [2. 데이터 전처리]
-    # 결측치(빈 값)가 하나라도 포함된 행 삭제
+    # [전처리 1] 결측치가 포함된 행 제거
     df = df.dropna()
     
-    # "기준일자"와 "개봉일" 컬럼을 날짜(datetime) 형식으로 변환
-    df['기준일자'] = pd.to_datetime(df['기준일자'].astype(str))
-    df['개봉일'] = pd.to_datetime(df['개봉일'].astype(str))
+    # [전처리 2] '기준일자' 및 '개봉일' 컬럼을 datetime(날짜) 형식으로 변환
+    df['기준일자'] = pd.to_datetime(df['기준일자'])
+    df['개봉일'] = pd.to_datetime(df['개봉일'])
     
-    # 기준일자 오름차순으로 전체 데이터 정렬
-    df = df.sort_values(by='기준일자')
+    # [전처리 3] 전체 데이터를 기준일자 순서대로 정렬 (오름차순)
+    df = df.sort_values(by='기준일자').reset_index(drop=True)
     
     return df
 
-# 데이터 로드 실행
-df = load_data()
+# 데이터 로드
+df = load_and_preprocess_data()
 
-# [3. 영화 선택 기능]
-# 중복 없이 영화명 목록을 가져오기
+# ---------------------------------------------------------
+# [구역 1] 영화별 관객 수 추이 분석
+# ---------------------------------------------------------
+st.header("1. 영화별 일관객 수 변화 추이")
+
+# 3. 영화 선택 기능
+# 중복 없는 영화 이름 목록 추출
 movie_list = df['영화명'].unique()
 
-# 사이드바에 영화 선택 드롭다운 생성
-st.sidebar.header("🎯 조건 선택")
-selected_movie = st.sidebar.selectbox("분석할 영화를 선택하세요:", movie_list)
-
-# 선택한 영화의 데이터만 필터링
-filtered_df = df[df['영화명'] == selected_movie]
-
-# 메인 화면 영역 나누기
-st.markdown("---")
-
-# [4. 선그래프 구역]
-st.subheader(f"📊 '{selected_movie}' 날짜별 일관객수 변화")
-
-# Plotly 선그래프 그리기 (X축: 기준일자, Y축: 일관객수)
-fig = px.line(
-    filtered_df,
-    x='기준일자',
-    y='일관객수',
-    title=f"<{selected_movie}> 일관객수 추이",
-    labels={'기준일자': '날짜', '일관객수': '일일 관객수(명)'},
-    markers=True  # 데이터 지점에 점 표시
+# 사용자 선택을 위한 셀렉트박스 생성
+selected_movie = st.selectbox(
+    "📊 분석할 영화를 선택하세요:",
+    options=movie_list
 )
 
-# 그래프 화면 출력
-st.plotly_chart(fig, use_container_width=True)
+# 선택한 영화 데이터만 필터링
+filtered_df = df[df['영화명'] == selected_movie]
 
-# [5. 기타 - 그래프 설명 문구 영역]
-st.info("💡 **이 그래프로 알 수 있는 것:** 선택한 영화의 개봉 이후 날짜별 관객수 증감 추이와 흥행 유지 기간을 한눈에 파악할 수 있습니다.")
+# 관객 수 컬럼 자동 감지 (데이터셋 컬럼명 유연 대응: '일관객수', '일관객', '관객수' 등)
+target_col = None
+for col in ['일관객수', '일관객', '관객수']:
+    if col in filtered_df.columns:
+        target_col = col
+        break
 
-st.markdown("---")
+# 관객 수 컬럼이 존재하는 경우 그래프 생성
+if target_col:
+    # 4. Plotly 선 그래프 생성
+    fig = px.line(
+        filtered_df,
+        x='기준일자',
+        y=target_col,
+        title=f"<{selected_movie}> 기준일자별 일관객 수 변화",
+        labels={'기준일자': '날짜', target_col: '일일 관객 수'},
+        markers=True  # 그래프 선 위에 데이터 점 표시
+    )
+    
+    # 그래프 선 및 레이아웃 스타일 설정
+    fig.update_traces(line_color="#FF4B4B")
+    fig.update_layout(hovermode="x unified")
+    
+    # Streamlit 화면에 그래프 출력
+    st.plotly_chart(fig, use_container_width=True)
+    
+    # 5. 그래프 설명 문구 영역
+    st.info(f"💡 **이 그래프로 알 수 있는 것:** '{selected_movie}'의 개봉 이후 관객 수 증감 추이와 최고 관객 수를 기록한 시점을 확인할 수 있습니다.")
 
-# [추후 그래프 추가 구역 예시]
-st.subheader("📌 2번 그래프 구역 (추후 추가 예정)")
-st.write("새로운 그래프가 추가될 영역입니다.")
+else:
+    st.warning("관객 수 관련 컬럼을 찾을 수 없습니다. 데이터 컬럼명을 확인해주세요.")
 
-# 추가될 그래프 아래 문구 영역 예시
-st.caption("💡 **이 그래프로 알 수 있는 것:** (추후 추가되는 분석 내용 설명 작성 위치)")
+# 구분선 추가
+st.divider()
+
+# ---------------------------------------------------------
+# [구역 2] 추후 추가될 그래프 구역 (확장용 공간)
+# ---------------------------------------------------------
+st.header("2. 추가 분석 구역 (예정)")
+st.write("앞으로 추가할 차트 및 분석 항목이 이 구역에 들어갈 예정입니다.")
+
+# 향후 추가될 그래프의 예시 프레임
+with st.container():
+    st.subheader("📌 [예시] 주말 vs 평일 관객 비교 (준비 중)")
+    # 추후 차트 코드 삽입 영역
+    
+    # 그래프 설명 문구 자리를 미리 확보
+    st.info("💡 **이 그래프로 알 수 있는 것:** (추후 추가될 그래프에 대한 설명 문구가 들어갈 자리입니다.)")
