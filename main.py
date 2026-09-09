@@ -52,12 +52,6 @@ filtered_df = df[df["영화명"] == selected_movie].copy()
 
 # -----------------------------------------------------------------------------
 # [탭 구역 생성]
-# 1탭: 선택 영화 관객수 추이 (선그래프)
-# 2탭: 선택 영화 누적 관객수 변화 (영역차트)
-# 3탭: TOP 10 전체 관객수 및 7일 이동평균 (선그래프)
-# 4탭: 월별 전체 관객수 합계 (막대그래프)
-# 5탭: TOP 5 영화 누적관객수 비교 (다중 선그래프)
-# 6탭: 추가 분석 구역 (예정)
 # -----------------------------------------------------------------------------
 tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
     "📈 선택 영화 관객수 추이", 
@@ -75,27 +69,22 @@ with tab1:
     st.subheader(f"'{selected_movie}' 날짜별 관객수 변화")
     
     if not filtered_df.empty:
-        # Plotly를 사용하여 날짜별('기준일자') 해당일관객수 변화를 선그래프로 그립니다.
         fig1 = px.line(
             filtered_df,
             x="기준일자",
             y="해당일관객수",
             title=f"[{selected_movie}] 일별 관객수 추이",
             labels={"기준일자": "날짜", "해당일관객수": "관객수 (명)"},
-            markers=True  # 데이터 점 표시
+            markers=True
         )
         
-        # 그래프 레이아웃 스타일 설정
         fig1.update_layout(
             hovermode="x unified",
             xaxis_title="기준일자",
             yaxis_title="해당일관객수"
         )
         
-        # Streamlit에 Plotly 그래프 표시
         st.plotly_chart(fig1, use_container_width=True)
-        
-        # '이 그래프로 알 수 있는 것' 안내문
         st.info(f"💡 **이 그래프로 알 수 있는 것:** '{selected_movie}' 영화는 특정 날짜에 관객수가 가장 높았으며, 개봉/상영 기간 동안 일별 흥행 추이를 확인할 수 있습니다.")
     else:
         st.warning("선택한 영화의 데이터가 존재하지 않습니다.")
@@ -107,7 +96,6 @@ with tab2:
     st.subheader(f"'{selected_movie}' 기준일자별 누적 관객수 변화")
     
     if not filtered_df.empty:
-        # Plotly를 사용하여 날짜별('기준일자') 누적관객수 변화를 영역차트(area chart)로 그립니다.
         fig2 = px.area(
             filtered_df,
             x="기준일자",
@@ -116,17 +104,13 @@ with tab2:
             labels={"기준일자": "날짜", "누적관객수": "누적 관객수 (명)"}
         )
         
-        # 그래프 레이아웃 스타일 설정
         fig2.update_layout(
             hovermode="x unified",
             xaxis_title="기준일자",
             yaxis_title="누적관객수"
         )
         
-        # Streamlit에 Plotly 영역차트 표시
         st.plotly_chart(fig2, use_container_width=True)
-        
-        # '이 그래프로 알 수 있는 것' 안내문
         st.info(f"💡 **이 그래프로 알 수 있는 것:** '{selected_movie}' 영화의 상영 기간 동안 누적 관객수가 어떻게 지속적으로 증가했는지 전체적인 흥행 스케일을 확인할 수 있습니다.")
     else:
         st.warning("선택한 영화의 데이터가 존재하지 않습니다.")
@@ -134,40 +118,34 @@ with tab2:
 # -----------------------------------------------------------------------------
 # 세 번째 그래프: [이동평균선 - TOP10 전체 관객수]
 # -----------------------------------------------------------------------------
-# 1. 기준일자별로 전체 TOP 10 영화의 해당일관객수 합계를 구합니다.
 daily_top10_sum = df.groupby("기준일자")["해당일관객수"].sum().reset_index()
 daily_top10_sum = daily_top10_sum.sort_values(by="기준일자")
 
 with tab3:
     st.subheader("🎬 TOP 10 전체 관객수 합계 및 7일 이동평균 추이")
     
-    # 2. 7일 이동평균(7-day Moving Average)을 계산합니다.
     daily_top10_sum["7일_이동평균"] = daily_top10_sum["해당일관객수"].rolling(window=7, min_periods=1).mean()
     
-    # 3. plotly.graph_objects를 사용하여 원본 선과 이동평균 선을 겹쳐서 그립니다.
     fig3 = go.Figure()
     
-    # 원본 관객수 합계 선 (연하게 표시)
     fig3.add_trace(go.Scatter(
         x=daily_top10_sum["기준일자"],
         y=daily_top10_sum["해당일관객수"],
         mode="lines",
         name="일별 총 관객수 (일일 원본)",
-        line=dict(color="rgba(100, 149, 237, 0.35)", width=1.5), # 연한 파란색
+        line=dict(color="rgba(100, 149, 237, 0.35)", width=1.5),
         hovertemplate="일별 관객수: %{y:,.0f}명<extra></extra>"
     ))
     
-    # 7일 이동평균 선 (진하게 표시)
     fig3.add_trace(go.Scatter(
         x=daily_top10_sum["기준일자"],
         y=daily_top10_sum["7일_이동평균"],
         mode="lines",
         name="7일 이동평균",
-        line=dict(color="#1f77b4", width=3), # 진한 파란색
+        line=dict(color="#1f77b4", width=3),
         hovertemplate="7일 이동평균: %{y:,.0f}명<extra></extra>"
     ))
     
-    # 레이아웃 설정
     fig3.update_layout(
         title="기준일자별 TOP 10 전체 관객수 합계 및 7일 이동평균",
         xaxis_title="기준일자",
@@ -176,10 +154,7 @@ with tab3:
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
     )
     
-    # Streamlit에 표시
     st.plotly_chart(fig3, use_container_width=True)
-    
-    # '이 그래프로 알 수 있는 것' 안내문
     st.info("💡 **이 그래프로 알 수 있는 것:** 요일이나 일별 변동성이 큰 단기 관객수 변동(연한 선)을 7일 이동평균선(진한 선)으로 평활화하여 극장가 전체의 중장기적인 시장 관객 수 흐름과 성수기/비수기 트렌드를 명확하게 파악할 수 있습니다.")
 
 # -----------------------------------------------------------------------------
@@ -188,68 +163,67 @@ with tab3:
 with tab4:
     st.subheader("📅 월별(연-월) 전체 관객수 합계")
     
-    # 기준일자별 관객수 합계(daily_top10_sum) 데이터에서 연-월(YYYY-MM) 컬럼을 생성합니다.
     daily_top10_sum_copy = daily_top10_sum.copy()
     daily_top10_sum_copy["연월"] = daily_top10_sum_copy["기준일자"].dt.strftime("%Y-%m")
     
-    # 월(연-월) 단위로 그룹화하여 관객수를 합산합니다.
     monthly_sum = daily_top10_sum_copy.groupby("연월")["해당일관객수"].sum().reset_index()
     monthly_sum = monthly_sum.rename(columns={"해당일관객수": "월별관객수합계"})
     
-    # Plotly 막대그래프 그리기
     fig4 = px.bar(
         monthly_sum,
         x="연월",
         y="월별관객수합계",
         title="월별 전체 관객수 합계 추이",
         labels={"연월": "연-월", "월별관객수합계": "총 관객수 (명)"},
-        text_auto=",.0f"  # 막대 위에 숫자를 세천단위 콤마 형식으로 표시
+        text_auto=",.0f"
     )
     
-    # 막대 색상 및 레이아웃 설정
     fig4.update_traces(marker_color="#2b5c8f")
     fig4.update_layout(
         xaxis_title="연-월",
         yaxis_title="월별 관객수 합계 (명)",
-        xaxis=dict(type="category")  # 연-월 축을 카테고리 형태로 고정
+        xaxis=dict(type="category")
     )
     
-    # Streamlit에 표시
     st.plotly_chart(fig4, use_container_width=True)
-    
-    # '이 그래프로 알 수 있는 것' 안내문
     st.info("💡 **이 그래프로 알 수 있는 것:** 월별 총 관객수 규모를 집계하여 어느 달(예: 방학 시즌, 연말, 명절 등)에 극장 방문객 수가 가장 많은지 계절성 및 월별 시장 성과를 한눈에 비교할 수 있습니다.")
 
 # -----------------------------------------------------------------------------
-# 다섯 번째 그래프: [다중 선그래프 - 최고 누적관객수 TOP 5 영화 비교]
+# 다섯 번째 그래프: [다중 선그래프 - 20일 이상 TOP10 진입 영화 중 최고 누적관객수 TOP 5]
 # -----------------------------------------------------------------------------
 with tab5:
-    st.subheader("🏆 누적관객수 TOP 5 영화의 기준일자별 누적관객수 추이 비교")
+    st.subheader("🏆 장기 흥행(20일 이상 차트인) TOP 5 영화의 누적관객수 추이")
     
-    # 1. 영화별 최고 누적관객수를 구하여 상위 5개 영화 선택
+    # 1. 영화별 차트인(TOP10 진입) 등장 일수 계산
+    movie_counts = df.groupby("영화명")["기준일자"].nunique()
+    
+    # 2. 20일 이상 등장한 영화 리스트 필터링
+    movies_over_20days = movie_counts[movie_counts >= 20].index
+    
+    # 3. 해당 영화들 중 최고 누적관객수 상위 5개 영화 선별
     top5_movies = (
-        df.groupby("영화명")["누적관객수"]
+        df[df["영화명"].isin(movies_over_20days)]
+        .groupby("영화명")["누적관객수"]
         .max()
         .nlargest(5)
         .index
         .tolist()
     )
     
-    # 2. TOP 5 영화의 데이터만 추출
+    # 4. 선택된 5개 영화의 데이터 추출
     top5_df = df[df["영화명"].isin(top5_movies)].copy()
     
-    # 3. Plotly 다중 선그래프 그리기 (color='영화명'으로 범례 및 영화별 컬러 자동 구분)
+    # 5. 다중 선그래프 생성 (color='영화명'으로 색상 및 범례 자동 구분)
     fig5 = px.line(
         top5_df,
         x="기준일자",
         y="누적관객수",
         color="영화명",
-        title="TOP 5 흥행 영화별 누적관객수 성장 추이",
+        title="TOP10 차트인 20일 이상 영화 중 누적관객수 TOP 5 비교",
         labels={"기준일자": "날짜", "누적관객수": "누적 관객수 (명)", "영화명": "영화 제목"},
         markers=True
     )
     
-    # 레이아웃 설정
     fig5.update_layout(
         hovermode="x unified",
         xaxis_title="기준일자",
@@ -257,14 +231,12 @@ with tab5:
         legend_title_text="영화명"
     )
     
-    # Streamlit에 표시
     st.plotly_chart(fig5, use_container_width=True)
     
-    # TOP 5 영화 목록 텍스트 생성
     top5_str = ", ".join([f"'{m}'" for m in top5_movies])
     
-    # '이 그래프로 알 수 있는 것' 안내문
-    st.info(f"💡 **이 그래프로 알 수 있는 것:** 최고 누적 관객수를 기록한 상위 5개 영화({top5_str})의 흥행 속도와 누적 관객수 역전 현상, 상영 기간 동안의 누적 관객수 증가세를 한눈에 비교할 수 있습니다.")
+    # '이 그래프로 알 수 있는 것' 공간
+    st.info(f"💡 **이 그래프로 알 수 있는 것:** 박스오피스 TOP10에 20일 이상 연속/장기 진입하며 꾸준한 관객을 모은 대표 흥행작({top5_str}) 5편의 관객수 누적 속도와 시기별 흥행 격차를 비교할 수 있습니다.")
 
 # -----------------------------------------------------------------------------
 # 여섯 번째 탭: [추가 예정 구역]
