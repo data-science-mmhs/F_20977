@@ -231,9 +231,9 @@ with tab5:
         "월 단위 전체 관객 수의 변화를 통해 연중 극장가의 최대 성수기(여름, 명절, 연말 등)와 비수기가 언제 형성되는지 월별 시장 규모 추이를 한눈에 파악할 수 있습니다."
     )
 
-# [Tab 6: 월(주차) × 요일별 캘린더 히트맵]
+# [Tab 6: 월(주차) × 요일별 캘린더 히트맵 (X, Y축 전환)]
 with tab6:
-    st.subheader("🗓️ 캘린더 히트맵 (월·주차별 × 요일별 관객수 분포)")
+    st.subheader("🗓️ 캘린더 히트맵 (요일별 × 월·주차별 관객수 분포)")
 
     # 1. 히트맵 생성을 위한 날짜 관련 컬럼 전처리
     heatmap_df = daily_total.copy()
@@ -261,34 +261,34 @@ with tab6:
     # 마우스 오버 시 출력할 yyyy-mm-dd 날짜 텍스트 컬럼 생성
     heatmap_df["날짜_str"] = heatmap_df["기준일자"].dt.strftime("%Y-%m-%d")
 
-    # Y축 레이블용: YYYY-MM (Week WW) 형태
+    # X축 레이블용: YYYY-MM (Week WW) 형태
     heatmap_df["연월_주차"] = heatmap_df["기준일자"].dt.strftime(
         "%Y-%m (%U주차)"
     )
 
-    # 2. Plotly Density Heatmap 생성
+    # 2. Plotly Density Heatmap 생성 (X축: 월/주차, Y축: 요일)
     fig_heatmap = px.density_heatmap(
         heatmap_df,
-        x="요일",
-        y="연월_주차",
-        z="해당일관객수",
-        category_orders={"요일": weekday_order},  # 월~일 요일 순서 지정
+        x="연월_주차",  # X축: 월(주차)
+        y="요일",  # Y축: 요일
+        z="해당일관객수",  # 색상 데이터: 관객수
+        category_orders={"요일": weekday_order},  # Y축 요일을 월~일 순서로 설정
         color_continuous_scale="Reds",  # 관객수가 많을수록 진한 빨간색
         title="일별 전체 관객수 캘린더 히트맵",
         labels={
-            "요일": "요일",
             "연월_주차": "월 (주차)",
+            "요일": "요일",
             "해당일관객수": "관객수(명)",
         },
-        hover_data={"날짜_str": True, "요일": False, "연월_주차": False},
+        hover_data={"날짜_str": True, "연월_주차": False, "요일": False},
     )
 
     # 3. 마우스 호버(Hover) 툴팁 커스텀 설정
     fig_heatmap.update_traces(
-        hovertemplate="<b>날짜: %{customdata[0]}</b><br>요일: %{x}<br>총 관객수: %{z:,}명<extra></extra>"
+        hovertemplate="<b>날짜: %{customdata[0]}</b><br>요일: %{y}<br>총 관객수: %{z:,}명<extra></extra>"
     )
 
-    # Y축을 시간순(위에서 아래로) 배치
+    # Y축(요일)을 위에서부터 월요일->일요일 순으로 표시되도록 정렬 조정
     fig_heatmap.update_layout(yaxis=dict(autorange="reversed"))
 
     st.plotly_chart(fig_heatmap, use_container_width=True)
@@ -296,5 +296,6 @@ with tab6:
     # 그래프 설명 문구 자리
     st.info(
         "💡 **이 그래프로 알 수 있는 것:** "
-        "요일별 관객수 집계 패턴을 한눈에 비교하여, 평일 대비 주말(토/일) 및 특정 연휴 날짜에 관객수가 얼마나 대폭 증가하는지 색상의 짙은 정도(농도)로 용이하게 파악할 수 있습니다."
+        "가로축의 시간 흐름에 따른 주차별 관객 변화와 세로축의 요일별 관객집계 분포를 한눈에 파악할 수 있으며, "
+        "주말(토/일) 라인의 색상 농도를 통해 연중 극장가 관객 집중도를 직관적으로 파악할 수 있습니다."
     )
