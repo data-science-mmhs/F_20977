@@ -57,14 +57,15 @@ movie_df = df[df["영화명"] == selected_movie]
 # ==========================================
 # [4. 대시보드 구역 나누기 및 그래프 그리기]
 # ==========================================
-# 탭 구역 생성 (Tab 1: 개별 일별, Tab 2: 개별 누적, Tab 3: TOP5 비교, Tab 4: 이동평균, Tab 5: 월별 관객수)
-tab1, tab2, tab3, tab4, tab5 = st.tabs(
+# 탭 구역 생성
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
     [
         "📈 일별 관객수 추이",
         "🏔️ 누적 관객수 추이",
         "🏆 장기 흥행 TOP 5 비교",
         "📊 전체 관객수 & 7일 이동평균",
         "📅 월별 총 관객수",
+        "🗓️ 캘린더 히트맵",
     ]
 )
 
@@ -201,38 +202,99 @@ with tab4:
 with tab5:
     st.subheader("📅 월별 박스오피스 전체 관객수 합계")
 
-    # 1. 일별 전체 관객수 데이터를 기반으로 연-월(YYYY-MM) 컬럼 생성
     daily_total_copy = daily_total.copy()
     daily_total_copy["연월"] = daily_total_copy["기준일자"].dt.to_period(
         "M"
     )
 
-    # 2. 월별로 그룹화하여 관객수 합계 계산
     monthly_total = (
         daily_total_copy.groupby("연월")["해당일관객수"].sum().reset_index()
     )
-    # Plotly 시각화를 위해 연월 컬럼을 문자열 형식으로 변환
     monthly_total["연월"] = monthly_total["연월"].astype(str)
 
-    # 3. Plotly 막대그래프 생성
     fig_bar = px.bar(
         monthly_total,
         x="연월",
         y="해당일관객수",
         title="월별 극장가 전체 관객수 합계",
-        text_auto=".2s",  # 막대 상단에 간략화된 수치(예: 1.2M 등) 자동 표시
+        text_auto=".2s",
         labels={"연월": "월(연-월)", "해당일관객수": "월간 총 관객수(명)"},
     )
 
-    fig_bar.update_traces(
-        textposition="outside"
-    )  # 텍스트 위치를 막대 바깥 상단으로 설정
-    fig_bar.update_layout(xaxis_type="category")  # X축 범주형 처리
+    fig_bar.update_traces(textposition="outside")
+    fig_bar.update_layout(xaxis_type="category")
 
     st.plotly_chart(fig_bar, use_container_width=True)
+
+    st.info(
+        "💡 **이 그래프로 알 수 있는 것:** "
+        "월 단위 전체 관객 수의 변화를 통해 연중 극장가의 최대 성수기(여름, 명절, 연말 등)와 비수기가 언제 형성되는지 월별 시장 규모 추이를 한눈에 파악할 수 있습니다."
+    )
+
+# [Tab 6: 월(주차) × 요일별 캘린더 히트맵]
+with tab6:
+    st.subheader("🗓️ 캘린더 히트맵 (월·주차별 × 요일별 관객수 분포)")
+
+    # 1. 히트맵 생성을 위한 날짜 관련 컬럼 전처리
+    heatmap_df = daily_total.copy()
+
+    # 요일 이름 추출 및 월요일부터 일요일 순서로 정렬 설정
+    weekday_order = [
+        "월요일",
+        "화요일",
+        "수요일",
+        "목요일",
+        "금요일",
+        "토요일",
+        "일요일",
+    ]
+    heatmap_df["요일"] = heatmap_df["기준일자"].dt.day_name().map({
+        "Monday": "월요일",
+        "Tuesday": "화요일",
+        "Wednesday": "수요일",
+        "Thursday": "목요일",
+        "Friday": "금요일",
+        "Saturday": "토요일",
+        "Sunday": "일요일",
+    })
+
+    # 마우스 오버 시 출력할 yyyy-mm-dd 날짜 텍스트 컬럼 생성
+    heatmap_df["날짜_str"] = heatmap_df["기준일자"].dt.strftime("%Y-%m-%d")
+
+    # Y축 레이블용: YYYY-MM (Week WW) 형태
+    heatmap_df["연월_주차"] = heatmap_df["기준일자"].dt.strftime(
+        "%Y-%m (%U주차)"
+    )
+
+    # 2. Plotly Density Heatmap 생성
+    fig_heatmap = px.density_heatmap(
+        heatmap_df,
+        x="요일",
+        y="연월_주차",
+        z="해당일관객수",
+        category_orders={"요일": weekday_order},  # 월~일 요일 순서 지정
+        color_continuous_scale="Reds",  # 관객수가 많을수록 진한 빨간색
+        title="일별 전체 관객수 캘린더 히트맵",
+        labels={
+            "요일": "요일",
+            "연월_주차": "월 (주차)",
+            "해당일관객수": "관객수(명)",
+        },
+        hover_data={"날짜_str": True, "요일": False, "연월_주차": False},
+    )
+
+    # 3. 마우스 호버(Hover) 툴팁 커스텀 설정
+    fig_heatmap.update_traces(
+        hovertemplate="<b>날짜: %{customdata[0]}</b><br>요일: %{x}<br>총 관객수: %{z:,}명<extra></extra>"
+    )
+
+    # Y축을 시간순(위에서 아래로) 배치
+    fig_heatmap.update_layout(yaxis=dict(autorange="reversed"))
+
+    st.plotly_chart(fig_heatmap, use_container_width=True)
 
     # 그래프 설명 문구 자리
     st.info(
         "💡 **이 그래프로 알 수 있는 것:** "
-        "월 단위 전체 관객 수의 변화를 통해 연중 극장가의 최대 성수기(여름, 명절, 연말 등)와 비수기가 언제 형성되는지 월별 시장 규모 추이를 한눈에 파악할 수 있습니다."
+        "요일별 관객수 집계 패턴을 한눈에 비교하여, 평일 대비 주말(토/일) 및 특정 연휴 날짜에 관객수가 얼마나 대폭 증가하는지 색상의 짙은 정도(농도)로 용이하게 파악할 수 있습니다."
     )
